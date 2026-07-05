@@ -10,7 +10,7 @@ from config import EMBEDDING_MODEL
 
 @lru_cache(maxsize=1)
 def get_model() -> SentenceTransformer:
-    return SentenceTransformer(EMBEDDING_MODEL)
+    return SentenceTransformer(EMBEDDING_MODEL, device="cpu")
 
 
 def embed_texts(texts: list[str]) -> np.ndarray:

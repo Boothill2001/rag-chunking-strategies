@@ -2,6 +2,20 @@
 
 Interactive comparison of 3 chunking strategies for RAG systems — see how document splitting impacts retrieval quality.
 
+## Screenshots
+
+### Chunk Analysis — Side-by-Side Metrics
+
+![Chunk Analysis](assets/demo_chunk_analysis.png)
+
+### Retrieval Compare — Same Query, Different Results
+
+![Retrieval Compare](assets/demo_retrieval_compare.png)
+
+### Visual Compare — Charts & Distribution
+
+![Visual Compare](assets/demo_visual_compare.png)
+
 ## Why This Matters
 
 Chunking is the most underestimated step in RAG pipelines. Fixed-size chunking (every 512 tokens) is the default in most tutorials, but it breaks tables, splits code blocks mid-function, and loses section context. This project demonstrates the problem and compares alternatives.
