@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hướng dẫn RAG Chunking Strategies — Nguyễn Minh Trí</title>
+<style>
+  :root {
+    --bg: #f7f5f0;
+    --surface: #ffffff;
+    --ink: #1e2430;
+    --muted: #5b6472;
+    --line: #e4dfd5;
+    --accent: #7c3aed;
+    --accent-soft: #ede9fe;
+    --accent2: #b4552d;
+    --accent2-soft: #f7e8df;
+    --code-bg: #1b2028;
+    --code-ink: #d8dee9;
+    --radius: 14px;
+    --shadow: 0 2px 12px rgba(30,36,48,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181f;
+      --surface: #1c222c;
+      --ink: #e8e6e1;
+      --muted: #9aa3b0;
+      --line: #2c3440;
+      --accent: #a78bfa;
+      --accent-soft: #2a1f4e;
+      --accent2: #e08a5e;
+      --accent2-soft: #3a251a;
+      --code-bg: #10141a;
+      --code-ink: #cfd6e0;
+      --shadow: 0 2px 12px rgba(0,0,0,.3);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--ink);
+    line-height: 1.7; font-size: 16.5px;
+  }
+  .hero {
+    background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 55%, #3b0764 100%);
+    color: #f2f0ff; padding: 64px 24px 56px; text-align: center;
+  }
+  .hero h1 { font-size: clamp(1.8rem, 4.5vw, 3rem); font-weight: 800; letter-spacing: -.02em; }
+  .hero h1 em { font-style: italic; font-family: Georgia, serif; color: #fcd34d; }
+  .hero p.sub { max-width: 720px; margin: 18px auto 0; font-size: 1.1rem; color: #c4b5fd; }
+  .badges { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .badge {
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+    padding: 6px 16px; border-radius: 999px; font-size: .85rem; font-weight: 600;
+  }
+  .hero a.repo {
+    display: inline-block; margin-top: 28px; background: #fcd34d; color: #3b0764;
+    font-weight: 700; text-decoration: none; padding: 12px 28px; border-radius: 999px;
+    transition: transform .15s ease;
+  }
+  .hero a.repo:hover { transform: translateY(-2px); }
+  nav {
+    position: sticky; top: 0; z-index: 50; background: var(--surface);
+    border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
+    overflow-x: auto; white-space: nowrap;
+  }
+  nav .inner { max-width: 980px; margin: 0 auto; padding: 0 16px; display: flex; gap: 4px; }
+  nav a {
+    display: inline-block; padding: 13px 14px; color: var(--muted);
+    text-decoration: none; font-size: .88rem; font-weight: 600; border-bottom: 3px solid transparent;
+  }
+  nav a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 20px 80px; }
+  section { margin-top: 56px; scroll-margin-top: 70px; }
+  h2 {
+    font-size: 1.7rem; font-weight: 800; letter-spacing: -.01em;
+    display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+  }
+  h2 .num {
+    background: var(--accent); color: #fff; width: 40px; height: 40px; flex: none;
+    border-radius: 12px; display: grid; place-items: center; font-size: 1.05rem;
+  }
+  h3 { margin: 26px 0 10px; font-size: 1.15rem; }
+  p { margin: 10px 0; }
+  p.lead { font-size: 1.06rem; color: var(--muted); }
+  strong { color: var(--ink); }
+  a { color: var(--accent); }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 22px 26px; box-shadow: var(--shadow); margin: 16px 0;
+  }
+  .callout {
+    border-left: 5px solid var(--accent); background: var(--accent-soft);
+    border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin: 18px 0;
+  }
+  .callout.warn { border-left-color: var(--accent2); background: var(--accent2-soft); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 20px 0; }
+  .feature {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px 22px; box-shadow: var(--shadow);
+  }
+  .feature .icon { font-size: 1.7rem; }
+  .feature h4 { margin: 10px 0 6px; font-size: 1.03rem; }
+  .feature p { font-size: .93rem; color: var(--muted); margin: 0; }
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 12px;
+    padding: 18px 20px; overflow-x: auto; font-size: .88rem; line-height: 1.6;
+    margin: 14px 0; font-family: Consolas, "Cascadia Code", monospace;
+  }
+  code.inline {
+    background: var(--accent-soft); color: var(--accent); padding: 2px 7px;
+    border-radius: 6px; font-size: .88em; font-family: Consolas, monospace;
+  }
+  pre .c { color: #7c8ba1; }
+  pre .k { color: #c4b5fd; }
+  .pipe { display: flex; flex-direction: column; gap: 0; margin: 22px 0; }
+  .pipe-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .pipe-box {
+    flex: 1; min-width: 200px; background: var(--surface); border: 2px solid var(--accent);
+    border-radius: 12px; padding: 14px 18px; text-align: center;
+  }
+  .pipe-box.alt { border-color: var(--accent2); }
+  .pipe-box b { display: block; font-size: .98rem; }
+  .pipe-box span { font-size: .84rem; color: var(--muted); }
+  .pipe-arrow { text-align: center; font-size: 1.5rem; color: var(--accent); padding: 4px 0; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); font-size: .95rem; }
+  th { background: var(--accent); color: #fff; text-align: left; padding: 12px 16px; font-size: .9rem; }
+  td { padding: 11px 16px; border-top: 1px solid var(--line); vertical-align: top; }
+  tr:nth-child(even) td { background: color-mix(in srgb, var(--surface) 92%, var(--accent) 8%); }
+  .tree { font-family: Consolas, monospace; font-size: .87rem; }
+  .tree .dir { color: var(--accent2); font-weight: 700; }
+  .tree .note { color: #7c8ba1; }
+  ol.steps { counter-reset: step; list-style: none; margin: 20px 0; }
+  ol.steps > li {
+    position: relative; padding: 4px 0 22px 58px; counter-increment: step;
+    border-left: 2px dashed var(--line); margin-left: 20px;
+  }
+  ol.steps > li:last-child { border-left-color: transparent; }
+  ol.steps > li::before {
+    content: counter(step); position: absolute; left: -21px; top: 0;
+    width: 40px; height: 40px; border-radius: 50%; background: var(--accent);
+    color: #fff; font-weight: 800; display: grid; place-items: center;
+  }
+  ol.steps b.t { font-size: 1.04rem; }
+  details {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    margin: 12px 0; box-shadow: var(--shadow); overflow: hidden;
+  }
+  summary {
+    cursor: pointer; padding: 16px 20px; font-weight: 700; list-style: none;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  }
+  summary::after { content: "+"; color: var(--accent); font-size: 1.2rem; flex: none; }
+  details[open] summary::after { content: "-"; }
+  details .body { padding: 0 20px 18px; color: var(--muted); }
+  details .body strong { color: var(--ink); }
+  footer {
+    text-align: center; padding: 40px 20px; color: var(--muted);
+    border-top: 1px solid var(--line); margin-top: 60px; font-size: .92rem;
+  }
+  @media (max-width: 640px) {
+    body { font-size: 15.5px; }
+    .hero { padding: 44px 18px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= HERO ================= -->
+<div class="hero">
+  <h1>RAG Chunking Strategies — <em>Hướng dẫn A-Z</em></h1>
+  <p class="sub">So sánh 3 chiến lược chunking: Fixed-size, Header-based, Semantic Paragraph —
+  trực quan bằng dashboard Streamlit, đo lường ảnh hưởng lên chất lượng retrieval.</p>
+  <div class="badges">
+    <span class="badge">Python 3.10+</span>
+    <span class="badge">Streamlit</span>
+    <span class="badge">Qdrant In-Memory</span>
+    <span class="badge">Sentence-Transformers</span>
+    <span class="badge">3 Strategies</span>
+  </div>
+  <a class="repo" href="https://github.com/Boothill2001/rag-chunking-strategies" target="_blank">Xem source trên GitHub</a>
+</div>
+
+<!-- ================= NAV ================= -->
+<nav><div class="inner">
+  <a href="#chunking">1. Chunking là gì</a>
+  <a href="#strategies">2. 3 chiến lược</a>
+  <a href="#files">3. Từng file</a>
+  <a href="#flow">4. Luồng chạy</a>
+  <a href="#setup">5. Cài đặt</a>
+  <a href="#demo">6. Chạy demo</a>
+  <a href="#docker">7. Docker</a>
+  <a href="#interview">8. Demo PV</a>
+  <a href="#qa">9. Q&amp;A</a>
+  <a href="#bugs">10. Lỗi hay gặp</a>
+</div></nav>
+
+<main>
+
+<!-- ================= 1 ================= -->
+<section id="chunking">
+  <h2><span class="num">1</span> Chunking là gì? Tại sao quan trọng?</h2>
+  <p class="lead">Trong RAG, trước khi tìm kiếm, ta phải <strong>cắt tài liệu dài thành các đoạn nhỏ (chunks)</strong>
+  rồi embed thành vector. Cách cắt ảnh hưởng trực tiếp đến chất lượng retrieval.</p>
+
+  <div class="card">
+    <p><strong>Tại sao không embed cả tài liệu?</strong></p>
+    <p>1) Model embedding có <strong>giới hạn token</strong> (thường 512 tokens).</p>
+    <p>2) Tài liệu dài → vector bị "pha loãng" (diluted) — 1 vector đại diện cho quá nhiều ý → tìm kiếm kém chính xác.</p>
+    <p>3) Chunk nhỏ, tập trung 1 chủ đề → vector "sắc nét" → retrieval chính xác hơn.</p>
+  </div>
+
+  <div class="callout">
+    Chunking tệ → retrieval kém → LLM trả lời sai/thiếu. Đây là bước dễ bị bỏ qua nhất trong RAG pipeline,
+    nhưng lại ảnh hưởng lớn nhất đến chất lượng cuối cùng.
+  </div>
+</section>
+
+<!-- ================= 2 ================= -->
+<section id="strategies">
+  <h2><span class="num">2</span> 3 chiến lược chunking</h2>
+
+  <div class="grid">
+    <div class="feature">
+      <div class="icon">1️⃣</div>
+      <h4>Fixed-size (Baseline)</h4>
+      <p>Cắt cứng mỗi N tokens, có overlap giữa các chunk. Đơn giản nhất, dùng làm baseline để so sánh.
+      <strong>Nhược:</strong> có thể chém đôi câu văn, bảng, heading.</p>
+    </div>
+    <div class="feature">
+      <div class="icon">2️⃣</div>
+      <h4>Header / Section-based</h4>
+      <p>Cắt theo <strong>heading markdown</strong> (# ## ###). Mỗi chunk = 1 section hoàn chỉnh.
+      Nếu section quá dài → chia nhỏ theo paragraph + overlap.
+      <strong>Ưu:</strong> giữ nguyên cấu trúc tài liệu.</p>
+    </div>
+    <div class="feature">
+      <div class="icon">3️⃣</div>
+      <h4>Semantic Paragraph</h4>
+      <p>Embed từng paragraph → tính <strong>cosine similarity</strong> giữa paragraph liên tiếp →
+      nếu similarity thấp hơn ngưỡng → cắt tại đó.
+      <strong>Ưu:</strong> cắt đúng ranh giới chuyển đề tài, không cần heading.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    Project này cho chạy cả 3 trên <strong>cùng tập tài liệu</strong> rồi so sánh:
+    chunk size distribution, boundary quality, và retrieval accuracy — tất cả hiển thị trực quan trên dashboard.
+  </div>
+</section>
+
+<!-- ================= 3 ================= -->
+<section id="files">
+  <h2><span class="num">3</span> Từng file làm gì?</h2>
+  <div class="card tree">
+<pre style="background:transparent;color:inherit;padding:0;margin:0">
+rag-chunking-strategies/
+├── <span class="dir">data/</span>
+│   ├── <span class="dir">enterprise_docs/</span>   <span class="note">← 18 tài liệu doanh nghiệp (HR, IT, Finance...)</span>
+│   └── <span class="dir">complex_docs/</span>      <span class="note">← 3 tài liệu edge-case: API ref, financial report, meeting notes</span>
+│
+├── <span class="dir">src/</span>
+│   ├── <span class="dir">chunkers/</span>
+│   │   ├── fixed.py         <span class="note">← Fixed-size chunking (baseline)</span>
+│   │   ├── header.py        <span class="note">← Header/section-based chunking</span>
+│   │   └── semantic.py      <span class="note">← Semantic paragraph chunking (cosine similarity)</span>
+│   ├── embeddings.py        <span class="note">← Shared embedding module (all-MiniLM-L6-v2)</span>
+│   ├── retrieval.py         <span class="note">← Qdrant in-memory retrieval cho so sánh</span>
+│   └── analysis.py          <span class="note">← ChunkStats, boundary quality metrics</span>
+│
+├── app.py                   <span class="note">← Streamlit dashboard: 3 tabs phân tích</span>
+├── config.py                <span class="note">← Config: MAX_CHUNK_TOKENS, overlap ratio, sim threshold</span>
+├── requirements.txt
+├── Dockerfile               <span class="note">← Python 3.11-slim, không cần API key</span>
+├── docker-compose.yml
+└── .gitignore
+</pre>
+  </div>
+</section>
+
+<!-- ================= 4 ================= -->
+<section id="flow">
+  <h2><span class="num">4</span> Luồng chạy khi dùng dashboard</h2>
+  <div class="pipe">
+    <div class="pipe-row">
+      <div class="pipe-box" style="border-style:dashed"><b>Upload / chọn tài liệu</b><span>18 enterprise docs + 3 edge-case docs</span></div>
+    </div>
+    <div class="pipe-arrow">↓ chạy song song 3 chiến lược ↓</div>
+    <div class="pipe-row">
+      <div class="pipe-box"><b>1️⃣ Fixed-size</b><span>cắt mỗi 512 tokens, overlap 15%</span></div>
+      <div class="pipe-box"><b>2️⃣ Header-based</b><span>cắt theo heading markdown</span></div>
+      <div class="pipe-box"><b>3️⃣ Semantic</b><span>cosine similarity giữa paragraphs</span></div>
+    </div>
+    <div class="pipe-arrow">↓</div>
+    <div class="pipe-row">
+      <div class="pipe-box alt"><b>Tab 1: Chunk Analysis</b><span>so sánh số chunk, avg size, boundary quality</span></div>
+    </div>
+    <div class="pipe-arrow">↓</div>
+    <div class="pipe-row">
+      <div class="pipe-box alt"><b>Tab 2: Retrieval Compare</b><span>query thử → xem top-k từ mỗi strategy</span></div>
+    </div>
+    <div class="pipe-arrow">↓</div>
+    <div class="pipe-row">
+      <div class="pipe-box"><b>Tab 3: Visual Compare</b><span>hiển thị boundaries trực quan trên tài liệu</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 5 ================= -->
+<section id="setup">
+  <h2><span class="num">5</span> Cài đặt từng bước (Windows)</h2>
+  <div class="callout warn">Yêu cầu: <strong>Python 3.10+</strong> — project này <strong>không cần API key</strong>, mọi thứ chạy local.</div>
+
+  <ol class="steps">
+    <li>
+      <b class="t">Clone repo</b>
+      <pre><span class="k">git clone https://github.com/Boothill2001/rag-chunking-strategies.git</span>
+<span class="k">cd rag-chunking-strategies</span></pre>
+    </li>
+    <li>
+      <b class="t">Tạo môi trường ảo</b>
+      <pre><span class="k">python -m venv .venv</span>
+<span class="k">.venv\Scripts\activate</span></pre>
+    </li>
+    <li>
+      <b class="t">Cài thư viện</b> — lần đầu tải ~400MB (sentence-transformers + torch).
+      <pre><span class="k">pip install -r requirements.txt</span></pre>
+    </li>
+    <li>
+      <b class="t">Chạy dashboard</b>
+      <pre><span class="k">streamlit run app.py</span>
+<span class="c"># Trình duyệt tự mở http://localhost:8501</span></pre>
+    </li>
+  </ol>
+</section>
+
+<!-- ================= 6 ================= -->
+<section id="demo">
+  <h2><span class="num">6</span> Chạy demo — 3 tab</h2>
+
+  <div class="card">
+    <h3 style="margin-top:0">Tab 1: Chunk Analysis</h3>
+    <p>So sánh metrics giữa 3 chiến lược trên cùng tài liệu: <strong>số chunk, avg token count, boundary quality score</strong>.
+    Biểu đồ bar chart cho thấy sự khác biệt rõ ràng.</p>
+
+    <h3>Tab 2: Retrieval Compare</h3>
+    <p>Gõ query → hệ thống chạy retrieval với chunks từ mỗi strategy → hiển thị <strong>top-k results song song</strong>
+    kèm similarity score. Cùng 1 câu hỏi, strategy khác nhau trả về chunk khác nhau.</p>
+
+    <h3>Tab 3: Visual Compare</h3>
+    <p>Hiển thị toàn bộ tài liệu với <strong>đường kẻ ranh giới chunk</strong> được highlight.
+    Dễ thấy: fixed cắt giữa câu, header cắt đúng section, semantic cắt ở chỗ đổi đề tài.</p>
+  </div>
+</section>
+
+<!-- ================= 7 ================= -->
+<section id="docker">
+  <h2><span class="num">7</span> Chạy bằng Docker</h2>
+  <div class="card">
+    <p>Không cần cài Python hay bất kỳ dependency nào:</p>
+    <pre><span class="k">docker compose up --build</span>
+<span class="c"># Mở http://localhost:8501</span></pre>
+    <p>Hoặc build thủ công:</p>
+    <pre><span class="k">docker build -t chunking-demo .</span>
+<span class="k">docker run -p 8501:8501 chunking-demo</span></pre>
+  </div>
+</section>
+
+<!-- ================= 8 ================= -->
+<section id="interview">
+  <h2><span class="num">8</span> Kịch bản demo phỏng vấn (3 phút)</h2>
+  <ol class="steps">
+    <li><b class="t">Mở Tab 1 — Chunk Analysis</b> → chỉ vào biểu đồ:
+      <em>"Em so sánh 3 cách chunk trên cùng tập tài liệu. Fixed cắt đều nhưng phá vỡ ngữ cảnh.
+      Header giữ cấu trúc nhưng phụ thuộc có heading. Semantic tự phát hiện ranh giới chủ đề."</em></li>
+    <li><b class="t">Mở Tab 3 — Visual Compare</b> → chỉ vào ranh giới:
+      <em>"Đây là trực quan — fixed cắt giữa câu ở đây, còn semantic cắt đúng chỗ đổi topic."</em></li>
+    <li><b class="t">Mở Tab 2 — Retrieval Compare</b> → gõ query → so top-k results:
+      <em>"Cùng 1 query, semantic chunking trả về chunk liên quan hơn vì ranh giới tốt hơn → embedding sắc nét hơn."</em></li>
+    <li><b class="t">Chốt:</b>
+      <em>"Chunking là bước thường bị bỏ qua, nhưng ảnh hưởng lớn nhất đến retrieval quality.
+      Em build dashboard này để đo lường và chứng minh, không phải đoán."</em></li>
+  </ol>
+</section>
+
+<!-- ================= 9 ================= -->
+<section id="qa">
+  <h2><span class="num">9</span> Câu hỏi phỏng vấn thường gặp</h2>
+
+  <details>
+    <summary>Tại sao chunking quan trọng trong RAG?</summary>
+    <div class="body"><p>Chunk là đơn vị retrieval — chunk tệ → vector bị pha loãng → tìm sai document →
+    LLM trả lời sai. Đây là <strong>điểm leverage lớn nhất</strong> trong RAG pipeline: cải thiện chunking
+    thường hiệu quả hơn đổi model đắt tiền hơn.</p></div>
+  </details>
+
+  <details>
+    <summary>Fixed-size chunking khi nào đủ tốt?</summary>
+    <div class="body"><p>Khi tài liệu <strong>đồng nhất, không có cấu trúc rõ</strong> (ví dụ: transcript,
+    chat log, plain text không heading). Hoặc khi cần <strong>baseline</strong> để so sánh.
+    Với overlap 10-15% thì vẫn chấp nhận được cho nhiều use case.</p></div>
+  </details>
+
+  <details>
+    <summary>Semantic chunking có nhược điểm gì?</summary>
+    <div class="body"><p><strong>Chậm hơn</strong> vì phải embed từng paragraph trước khi cắt.
+    <strong>Phụ thuộc model embedding</strong> — model yếu thì similarity score không đáng tin.
+    Với tài liệu đã có heading rõ ràng, header-based đơn giản hơn mà kết quả tương đương.</p></div>
+  </details>
+
+  <details>
+    <summary>Overlap giữa các chunk để làm gì?</summary>
+    <div class="body"><p>Khi cắt chunk, thông tin ở <strong>ranh giới bị mất ngữ cảnh</strong>.
+    Overlap (thường 10-20%) giúp chunk sau giữ lại phần cuối chunk trước → retrieval không bỏ sót
+    thông tin nằm vắt ngang ranh giới.</p></div>
+  </details>
+
+  <details>
+    <summary>Boundary quality đo bằng gì?</summary>
+    <div class="body"><p>Đo bằng <strong>cosine similarity giữa 2 paragraph ở ranh giới cắt</strong>.
+    Similarity thấp → ranh giới tốt (cắt đúng chỗ đổi chủ đề). Similarity cao → cắt giữa đoạn cùng chủ đề
+    (bad). Lấy trung bình ngược lại: <code class="inline">1 - avg_boundary_similarity</code>.</p></div>
+  </details>
+
+  <details>
+    <summary>Production thật nên dùng strategy nào?</summary>
+    <div class="body"><p>Phụ thuộc tài liệu: tài liệu có heading → <strong>header-based</strong>;
+    tài liệu dài không heading → <strong>semantic</strong>; mixed → <strong>kết hợp</strong> (header trước,
+    semantic cho section dài). Quan trọng nhất là <strong>đo lường</strong> trên corpus thật, không đoán.</p></div>
+  </details>
+</section>
+
+<!-- ================= 10 ================= -->
+<section id="bugs">
+  <h2><span class="num">10</span> Lỗi thường gặp &amp; cách sửa</h2>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Lỗi</th><th>Nguyên nhân &amp; cách sửa</th></tr>
+    <tr><td><code class="inline">NotImplementedError: Cannot copy out of meta tensor</code></td>
+      <td>sentence-transformers + torch trên Python 3.13 bị lỗi → dùng Python 3.11 hoặc pin:
+      <code class="inline">sentence-transformers==3.3.1, transformers==4.46.3, torch==2.11.0</code></td></tr>
+    <tr><td><code class="inline">ModuleNotFoundError: PreTrainedModel</code></td>
+      <td>sentence-transformers 5.x không tương thích transformers 5.x → downgrade về version ổn định ở trên</td></tr>
+    <tr><td>Streamlit màn hình đen</td>
+      <td>Port 8501 bị chiếm → chạy <code class="inline">streamlit run app.py --server.port 8502</code></td></tr>
+    <tr><td>Lần đầu chạy rất chậm</td>
+      <td>Đang tải model embedding ~90MB lần đầu, các lần sau sẽ dùng cache</td></tr>
+    <tr><td>Docker build lâu</td>
+      <td>Bình thường — đang cài torch + dependencies. Lần build sau sẽ dùng Docker layer cache</td></tr>
+  </table>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p><strong>Nguyễn Minh Trí</strong> — Senior AI Engineer (GenAI / LLM Applications)</p>
+  <p>minhtri.cm2001@gmail.com · <a href="https://github.com/Boothill2001/rag-chunking-strategies">github.com/Boothill2001/rag-chunking-strategies</a></p>
+</footer>
+
+</body>
+</html>
